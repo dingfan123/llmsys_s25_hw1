@@ -33,8 +33,10 @@ class Linear(minitorch.Module):
         # 2. Initialize self.bias to be a random parameter of (out_size)
         # 3. Set self.out_size to be out_size
         # HINT: make sure to use the RParam function
-    
-        raise NotImplementedError
+
+        self.weights = RParam(in_size, out_size)
+        self.bias = RParam(out_size)
+        self.out_size = out_size
     
         # END ASSIGN1_3
 
@@ -50,8 +52,11 @@ class Linear(minitorch.Module):
         # 4. Add self.bias
         # HINT: You can use the view function of minitorch.tensor for reshape
 
-        raise NotImplementedError
-    
+        x = x.view(batch, in_size)
+        w = self.weights.value.view(in_size, self.out_size)
+        out = x @ w
+        out = out + self.bias.value.view(1, self.out_size)
+        return out
         # END ASSIGN1_3
         
         
@@ -82,8 +87,8 @@ class Network(minitorch.Module):
         # BEGIN ASSIGN1_3
         # TODO
         # 1. Construct two linear layers: the first one is embedding_dim * hidden_dim, the second one is hidden_dim * 1
-
-        raise NotImplementedError
+        self.layer1 = Linear(embedding_dim, hidden_dim)
+        self.layer2 = Linear(hidden_dim, 1)
         # END ASSIGN1_3
         
         
@@ -96,13 +101,20 @@ class Network(minitorch.Module):
         # BEGIN ASSIGN1_3
         # TODO
         # 1. Average the embeddings on the sentence length dimension to obtain a tensor of (batch, embedding_dim)
+        x = embeddings.mean(dim=1)
+        batch, _, embed_dim = x.shape
+        x = x.view(batch, embed_dim)
         # 2. Apply the first linear layer
+        x = self.layer1(x)
         # 3. Apply ReLU and dropout (with dropout probability=self.dropout_prob)
+        x = x.relu()
+        x = minitorch.dropout(x, self.dropout_prob)
         # 4. Apply the second linear layer
+        x = self.layer2(x)
         # 5. Apply sigmoid and reshape to (batch)
+        x = x.sigmoid().view(batch)
         # HINT: You can use minitorch.dropout for dropout, and minitorch.tensor.relu for ReLU
-        
-        raise NotImplementedError
+        return x
     
         # END ASSIGN1_3
 
@@ -190,13 +202,30 @@ class SentenceSentimentTrain:
                 # BEGIN ASSIGN1_4
                 # TODO
                 # 1. Create x and y using minitorch.tensor function through our CudaKernelOps backend
+                x_batch = X_train[example_num: example_num + batch_size]
+                y_batch = y_train[example_num: example_num + batch_size]
+                x = minitorch.tensor(x_batch, BACKEND)
+                y = minitorch.tensor(y_batch, BACKEND)
+
                 # 2. Set requires_grad=True for x and y
+                x.requires_grad()
+                y.requires_grad()
+
                 # 3. Get the model output (as out)
-                # 4. Calculate the loss using Binary Crossentropy Loss
-                # 5. Call backward function of the loss
-                # 6. Use Optimizer to take a gradient step
+                out = model(x)
                 
-                raise NotImplementedError
+                # 4. Calculate the loss using Binary Crossentropy Loss
+                loss = -(y * out.log() + (-y + 1) * (-out + 1).log()).mean()
+
+                # 5. Call backward function of the loss
+                loss.backward()
+
+                # 6. Use Optimizer to take a gradient step
+                optim.step()
+                optim.zero_grad()
+                
+
+                
                 # END ASSIGN1_4
                 
                 
@@ -214,11 +243,16 @@ class SentenceSentimentTrain:
                 # BEGIN ASSIGN1_4
                 # TODO
                 # 1. Create x and y using minitorch.tensor function through our CudaKernelOps backend
+                x = minitorch.tensor(X_val, BACKEND)
+                y = minitorch.tensor(y_val, BACKEND)
                 # 2. Get the output of the model
+                out = model(x)
                 # 3. Obtain validation predictions using the get_predictions_array function, and add to the validation_predictions list
+                val_preds = get_predictions_array(y, out)
+                validation_predictions.append(val_preds)
                 # 4. Obtain the validation accuracy using the get_accuracy function, and add to the validation_accuracy list
-                
-                raise NotImplementedError
+                val_acc = get_accuracy(val_preds)
+                validation_accuracy.append(val_acc)
                 
                 # END ASSIGN1_4
                 
